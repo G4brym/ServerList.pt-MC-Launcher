@@ -1,5 +1,18 @@
-SKCraft Launcher
+ServerList.pt MC Launcher
 ================
+Forked from the community SKCraft -> Launcher
+
+### New Features
+
+* Works with Paid and Non-Pain Minecraft Users
+* When Installing an Vanilla Modpack, you can choose the version you want to play, the same vanilla modpack can install Minecraft 1.8 or 1.2.5 and provide the same files to all versions, this is very good to resource packs
+
+You can see an server configuration to download modpacks here
+https://github.com/G4brym/g4brym.github.io/tree/master/LauncherRepo/ServerList.pt
+(The configuration above only works with this Launcher becouse it uses the new Vanilla version chooser)
+
+-----------------------
+SKLauncher Docs
 
 SKCraft Launcher provides a platform for creating, testing, and distributing modpacks for groups of all sizes. It 100% open source and works on Windows, Mac OS X and Linux/BSD.
 
