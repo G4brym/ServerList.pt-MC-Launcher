@@ -10,15 +10,8 @@ import com.skcraft.concurrency.ObservableFuture;
 import com.skcraft.launcher.Instance;
 import com.skcraft.launcher.InstanceList;
 import com.skcraft.launcher.Launcher;
-import com.skcraft.launcher.dialog.renderer.InstanceCellRenderer;
 import com.skcraft.launcher.launch.LaunchListener;
-import com.skcraft.launcher.launch.LaunchOptions;
-import com.skcraft.launcher.launch.LaunchOptions.UpdatePolicy;
-import com.skcraft.launcher.swing.ActionListeners;
-import com.skcraft.launcher.swing.DoubleClickToButtonAdapter;
-import com.skcraft.launcher.swing.PopupMouseAdapter;
-import com.skcraft.launcher.swing.SwingHelper;
-import com.skcraft.launcher.swing.WebpagePanel;
+import com.skcraft.launcher.swing.*;
 import com.skcraft.launcher.util.SharedLocale;
 import com.skcraft.launcher.util.SwingExecutor;
 import lombok.Getter;
@@ -27,6 +20,8 @@ import lombok.extern.java.Log;
 import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -46,8 +41,11 @@ public class LauncherFrame extends JFrame {
 
     private final Launcher launcher;
 
-    @Getter private final JList<Instance> instancesList = new JList<Instance>();
-    @Getter private final JScrollPane instanceScroll = new JScrollPane(instancesList);
+    @Getter
+    private final InstanceTable instancesTable = new InstanceTable();
+    private final InstanceTableModel instancesModel;
+    @Getter
+    private final JScrollPane instanceScroll = new JScrollPane(instancesTable);
     private WebpagePanel webView;
     private JSplitPane splitPane;
     private final JButton launchButton = new JButton(SharedLocale.tr("launcher.launch"));
@@ -65,14 +63,15 @@ public class LauncherFrame extends JFrame {
         super(tr("launcher.title", launcher.getVersion()));
 
         this.launcher = launcher;
+        instancesModel = new InstanceTableModel(launcher.getInstances());
 
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setSize(700, 450);
         setMinimumSize(new Dimension(400, 300));
         initComponents();
-        pack();
         setLocationRelativeTo(null);
 
-        SwingHelper.setFrameIcon(this, Launcher.class, "icon.png");
+        SwingHelper.setIconImage(this, Launcher.class, "icon.png");
 
         SwingUtilities.invokeLater(new Runnable() {
             @Override
@@ -101,15 +100,12 @@ public class LauncherFrame extends JFrame {
         });
 
         updateCheck.setSelected(true);
-        instancesList.getSelectionModel().setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        instancesList.setDragEnabled(false);
-        instancesList.setCellRenderer(new InstanceCellRenderer());
-        instancesList.setModel(launcher.getInstances());
+        instancesTable.setModel(instancesModel);
         launchButton.setFont(launchButton.getFont().deriveFont(Font.BOLD));
         splitPane.setDividerLocation(200);
         splitPane.setDividerSize(4);
         splitPane.setOpaque(false);
-        container.add(splitPane, "grow, wrap, span 5, gapbottom unrel, w null:680, h null:350");
+        container.add(splitPane, "grow, wrap, span 5, gapbottom unrel");
         SwingHelper.flattenJSplitPane(splitPane);
         container.add(refreshButton);
         container.add(updateCheck);
@@ -119,7 +115,16 @@ public class LauncherFrame extends JFrame {
 
         add(container, BorderLayout.CENTER);
 
-        instancesList.addMouseListener(new DoubleClickToButtonAdapter(launchButton));
+        instancesModel.addTableModelListener(new TableModelListener() {
+            @Override
+            public void tableChanged(TableModelEvent e) {
+                if (instancesTable.getRowCount() > 0) {
+                    instancesTable.setRowSelectionInterval(0, 0);
+                }
+            }
+        });
+
+        instancesTable.addMouseListener(new DoubleClickToButtonAdapter(launchButton));
 
         refreshButton.addActionListener(new ActionListener() {
             @Override
@@ -150,19 +155,16 @@ public class LauncherFrame extends JFrame {
             }
         });
 
-        instancesList.addMouseListener(new PopupMouseAdapter() {
+        instancesTable.addMouseListener(new PopupMouseAdapter() {
             @Override
             protected void showPopup(MouseEvent e) {
-                //noinspection unchecked
-                JList<Instance> list = ((JList<Instance>) e.getSource());
-                int index = list.locationToIndex(new Point(e.getX(), e.getY()));
+                int index = instancesTable.rowAtPoint(e.getPoint());
+                Instance selected = null;
                 if (index >= 0) {
-                    list.setSelectedIndex(list.locationToIndex(new Point(e.getX(), e.getY())));
-                    Instance selected = list.getSelectedValue();
-                    popupInstanceMenu(e.getComponent(), e.getX(), e.getY(), selected);
-                } else {
-                    list.setSelectedValue(null, false);
+                    instancesTable.setRowSelectionInterval(index, index);
+                    selected = launcher.getInstances().get(index);
                 }
+                popupInstanceMenu(e.getComponent(), e.getX(), e.getY(), selected);
             }
         });
     }
@@ -193,7 +195,7 @@ public class LauncherFrame extends JFrame {
         JMenuItem menuItem;
 
         if (selected != null) {
-            menuItem = new JMenuItem(!selected.isLocal() ? tr("instance.install") : tr("instance.launch"));
+            menuItem = new JMenuItem(!selected.isLocal() ? "Install" : "Launch");
             menuItem.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -245,6 +247,7 @@ public class LauncherFrame extends JFrame {
                         public void actionPerformed(ActionEvent e) {
                             selected.setUpdatePending(true);
                             launch();
+                            instancesModel.update();
                         }
                     });
                     popup.add(menuItem);
@@ -314,6 +317,7 @@ public class LauncherFrame extends JFrame {
             @Override
             public void run() {
                 launch();
+                instancesModel.update();
             }
         }, SwingExecutor.INSTANCE);
     }
@@ -324,6 +328,10 @@ public class LauncherFrame extends JFrame {
         future.addListener(new Runnable() {
             @Override
             public void run() {
+                instancesModel.update();
+                if (instancesTable.getRowCount() > 0) {
+                    instancesTable.setRowSelectionInterval(0, 0);
+                }
                 requestFocus();
             }
         }, SwingExecutor.INSTANCE);
@@ -339,15 +347,9 @@ public class LauncherFrame extends JFrame {
 
     private void launch() {
         boolean permitUpdate = updateCheck.isSelected();
-        Instance instance = instancesList.getSelectedValue();
+        Instance instance = launcher.getInstances().get(instancesTable.getSelectedRow());
 
-        LaunchOptions options = new LaunchOptions.Builder()
-                .setInstance(instance)
-                .setListener(new LaunchListenerImpl(this))
-                .setUpdatePolicy(permitUpdate ? UpdatePolicy.UPDATE_IF_SESSION_ONLINE : UpdatePolicy.NO_UPDATE)
-                .setWindow(this)
-                .build();
-        launcher.getLaunchSupervisor().launch(options);
+        launcher.getLaunchSupervisor().launch(this, instance, permitUpdate, new LaunchListenerImpl(this));
     }
 
     private static class LaunchListenerImpl implements LaunchListener {
@@ -361,6 +363,10 @@ public class LauncherFrame extends JFrame {
 
         @Override
         public void instancesUpdated() {
+            LauncherFrame frame = frameRef.get();
+            if (frame != null) {
+                frame.instancesModel.update();
+            }
         }
 
         @Override

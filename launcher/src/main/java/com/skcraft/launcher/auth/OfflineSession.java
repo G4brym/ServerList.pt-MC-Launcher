@@ -39,12 +39,12 @@ public class OfflineSession implements Session {
 
     @Override
     public String getClientToken() {
-        return "0";
+		return "12345";
     }
 
     @Override
     public String getAccessToken() {
-        return "0";
+		return "12345";
     }
 
     @Override
@@ -54,7 +54,7 @@ public class OfflineSession implements Session {
 
     @Override
     public String getSessionToken() {
-        return "-";
+	 	return "12345";
     }
 
     @Override
@@ -64,7 +64,7 @@ public class OfflineSession implements Session {
 
     @Override
     public boolean isOnline() {
-        return false;
+	 	return true;
     }
 
 }

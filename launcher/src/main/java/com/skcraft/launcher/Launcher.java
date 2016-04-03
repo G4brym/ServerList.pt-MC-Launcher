@@ -21,30 +21,30 @@ import com.skcraft.launcher.persistence.Persistence;
 import com.skcraft.launcher.swing.SwingHelper;
 import com.skcraft.launcher.update.UpdateManager;
 import com.skcraft.launcher.util.HttpRequest;
+import com.skcraft.launcher.util.Platform;
 import com.skcraft.launcher.util.SharedLocale;
 import com.skcraft.launcher.util.SimpleLogFormatter;
-import com.sun.management.OperatingSystemMXBean;
+
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import lombok.extern.java.Log;
+
 import org.apache.commons.io.FileUtils;
 
 import javax.swing.*;
+
 import java.awt.*;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.lang.management.ManagementFactory;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
-
-import static com.skcraft.launcher.util.SharedLocale.tr;
 
 /**
  * The main entry point for the launcher.
@@ -74,28 +74,15 @@ public final class Launcher {
      * @throws java.io.IOException on load error
      */
     public Launcher(@NonNull File baseDir) throws IOException {
-        this(baseDir, baseDir);
-    }
-
-    /**
-     * Create a new launcher instance with the given base and configuration
-     * directories.
-     *
-     * @param baseDir the base directory
-     * @param configDir the config directory
-     * @throws java.io.IOException on load error
-     */
-    public Launcher(@NonNull File baseDir, @NonNull File configDir) throws IOException {
         SharedLocale.loadBundle("com.skcraft.launcher.lang.Launcher", Locale.getDefault());
 
         this.baseDir = baseDir;
-        this.properties = LauncherUtils.loadProperties(Launcher.class, "launcher.properties", "com.skcraft.launcher.propertiesFile");
+        this.properties = LauncherUtils.loadProperties(Launcher.class,
+                "launcher.properties", "com.skcraft.launcher.propertiesFile");
         this.instances = new InstanceList(this);
         this.assets = new AssetsRoot(new File(baseDir, "assets"));
-        this.config = Persistence.load(new File(configDir, "config.json"), Configuration.class);
-        this.accounts = Persistence.load(new File(configDir, "accounts.dat"), AccountList.class);
-
-        setDefaultConfig();
+        this.config = Persistence.load(new File(baseDir, "config.json"), Configuration.class);
+        this.accounts = Persistence.load(new File(baseDir, "accounts.dat"), AccountList.class);
 
         if (accounts.getSize() > 0) {
             accounts.setSelectedItem(accounts.getElementAt(0));
@@ -109,30 +96,6 @@ public final class Launcher {
         });
 
         updateManager.checkForUpdate();
-    }
-
-    /**
-     * Updates any incorrect / unset configuration settings with defaults.
-     */
-    public void setDefaultConfig() {
-        double configMax = config.getMaxMemory() / 1024.0;
-        double suggestedMax = 2;
-        double available = Double.MAX_VALUE;
-
-        try {
-            OperatingSystemMXBean bean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-            available = bean.getTotalPhysicalMemorySize() / 1024.0 / 1024.0 / 1024.0;
-            if (available <= 6) {
-                suggestedMax = available * 0.48;
-            } else {
-                suggestedMax = 4;
-            }
-        } catch (Exception ignored) {
-        }
-
-        if (config.getMaxMemory() <= 0 || configMax >= available - 1) {
-            config.setMaxMemory((int) (suggestedMax * 1024));
-        }
     }
 
     /**
@@ -374,6 +337,25 @@ public final class Launcher {
     }
 
     /**
+     * Detect platform.
+     * 
+     * @return platform
+     */
+    public static Platform getPlatform() {
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("win"))
+            return Platform.WINDOWS;
+        if (osName.contains("mac"))
+            return Platform.MAC_OS_X;
+        if (osName.contains("solaris") || osName.contains("sunos"))
+            return Platform.SOLARIS;
+        if (osName.contains("linux") || osName.contains("unix"))
+            return Platform.LINUX;
+        
+        return Platform.UNKNOWN;
+    }
+    
+    /**
      * Create a new launcher from arguments.
      *
      * @param args the arguments
@@ -392,8 +374,26 @@ public final class Launcher {
         if (dir != null) {
             log.info("Using given base directory " + dir.getAbsolutePath());
         } else {
-            dir = new File(".");
-            log.info("Using current directory " + dir.getAbsolutePath());
+        	String appDir="ServerList.pt";
+        	String homeDir = System.getProperty("user.home", ".");
+        	switch ( getPlatform() ) {
+        	case LINUX:
+        	case SOLARIS:
+                dir = new File(homeDir, "." + appDir + "/");
+                break;
+        	case WINDOWS:
+                String applicationData = System.getenv("APPDATA");
+                if (applicationData != null)
+                    dir = new File(applicationData, "." + appDir + "/");
+                else
+                    dir = new File(homeDir, "." + appDir + "/");
+                break;
+        	case MAC_OS_X:
+        		dir = new File(homeDir, "Library/Application Support/" + appDir);
+        		break;
+        	default:
+        		dir = new File(homeDir, appDir + "/");
+        	}
         }
 
         return new Launcher(dir);
@@ -419,8 +419,8 @@ public final class Launcher {
             public void run() {
                 try {
                     Launcher launcher = createFromArguments(args);
-                    SwingHelper.setSwingProperties(tr("launcher.appTitle", launcher.getVersion()));
                     UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                    UIManager.getDefaults().put("SplitPane.border", BorderFactory.createEmptyBorder());
                     launcher.showLauncherWindow();
                 } catch (Throwable t) {
                     log.log(Level.WARNING, "Load failure", t);

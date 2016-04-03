@@ -10,13 +10,14 @@ import javax.swing.*;
 import javax.swing.table.TableModel;
 import java.awt.*;
 
-public class CheckboxTable extends JTable {
+public class InstanceTable extends JTable {
 
-    public CheckboxTable() {
+    public InstanceTable() {
         setShowGrid(false);
-        setRowHeight((int) (Math.max(getRowHeight(), new JCheckBox().getPreferredSize().getHeight() - 2)));
+        setRowHeight(Math.max(getRowHeight() + 4, 20));
         setIntercellSpacing(new Dimension(0, 0));
         setFillsViewportHeight(true);
+        setTableHeader(null);
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
     }
 
@@ -24,7 +25,7 @@ public class CheckboxTable extends JTable {
     public void setModel(TableModel dataModel) {
         super.setModel(dataModel);
         try {
-            getColumnModel().getColumn(0).setMaxWidth((int) new JCheckBox().getPreferredSize().getWidth());
+            getColumnModel().getColumn(0).setMaxWidth(24);
         } catch (ArrayIndexOutOfBoundsException e) {
         }
     }

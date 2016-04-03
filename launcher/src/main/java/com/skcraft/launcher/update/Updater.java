@@ -15,6 +15,7 @@ import com.skcraft.launcher.Launcher;
 import com.skcraft.launcher.LauncherException;
 import com.skcraft.launcher.install.Installer;
 import com.skcraft.launcher.model.minecraft.VersionManifest;
+import com.skcraft.launcher.dialog.VersionDialog;
 import com.skcraft.launcher.model.modpack.Manifest;
 import com.skcraft.launcher.persistence.Persistence;
 import com.skcraft.launcher.util.HttpRequest;
@@ -142,6 +143,14 @@ public class Updater extends BaseUpdater implements Callable<Instance>, Progress
 
         // Update instance from manifest
         manifest.update(instance);
+
+        if(manifest.getGameVersion() == ""){
+        	VersionDialog.showVersionRequest(VersionDialog.getWind() , launcher);
+	        manifest.setGameVersion(VersionDialog.getVersion());
+	        if(VersionDialog.getVersion()==null){
+	        	manifest.setGameVersion(VersionDialog.getLastVersion());
+	        }
+        }
 
         // Read version manifest
         log.info("Reading version manifest...");

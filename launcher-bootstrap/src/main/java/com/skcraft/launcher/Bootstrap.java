@@ -23,7 +23,7 @@ import java.net.URLClassLoader;
 import java.util.*;
 import java.util.logging.Level;
 
-import static com.skcraft.launcher.bootstrap.SharedLocale.tr;
+import static com.skcraft.launcher.bootstrap.SharedLocale._;
 
 @Log
 public class Bootstrap {
@@ -49,7 +49,7 @@ public class Bootstrap {
         } catch (Throwable t) {
             Bootstrap.log.log(Level.WARNING, "Error", t);
             Bootstrap.setSwingLookAndFeel();
-            SwingHelper.showErrorDialog(null, tr("errors.bootstrapError"), tr("errorTitle"), t);
+            SwingHelper.showErrorDialog(null, _("errors.bootstrapError"), _("errorTitle"), t);
         }
     }
 

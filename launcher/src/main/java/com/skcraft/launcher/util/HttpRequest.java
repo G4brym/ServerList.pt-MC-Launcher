@@ -6,7 +6,6 @@
 
 package com.skcraft.launcher.util;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.skcraft.concurrency.ProgressObservable;
 import lombok.Getter;
@@ -110,7 +109,7 @@ public class HttpRequest implements Closeable, ProgressObservable {
             }
 
             conn = (HttpURLConnection) reformat(url).openConnection();
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Java) SKMCLauncher");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Java) ServerList.pt Launcher");
 
             if (body != null) {
                 conn.setRequestProperty("Content-Type", contentType);
@@ -453,24 +452,11 @@ public class HttpRequest implements Closeable, ProgressObservable {
          * Return the result as an instance of the given class that has been
          * deserialized from a JSON payload.
          *
-         * @param cls the class
          * @return the object
          * @throws java.io.IOException on I/O error
          */
         public <T> T asJson(Class<T> cls) throws IOException {
             return mapper.readValue(asString("UTF-8"), cls);
-        }
-
-        /**
-         * Return the result as an instance of the given type that has been
-         * deserialized from a JSON payload.
-         *
-         * @param type the type reference
-         * @return the object
-         * @throws java.io.IOException on I/O error
-         */
-        public <T> T asJson(TypeReference type) throws IOException {
-            return mapper.readValue(asString("UTF-8"), type);
         }
 
         /**

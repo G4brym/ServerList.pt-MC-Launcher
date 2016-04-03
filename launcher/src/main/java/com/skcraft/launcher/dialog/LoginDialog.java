@@ -6,6 +6,38 @@
 
 package com.skcraft.launcher.dialog;
 
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Window;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.IOException;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.Callable;
+
+import javax.swing.BorderFactory;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JPopupMenu;
+import javax.swing.JTabbedPane;
+import javax.swing.JTextField;
+import javax.swing.WindowConstants;
+
+import lombok.Getter;
+import lombok.NonNull;
+
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -13,21 +45,22 @@ import com.skcraft.concurrency.ObservableFuture;
 import com.skcraft.concurrency.ProgressObservable;
 import com.skcraft.launcher.Configuration;
 import com.skcraft.launcher.Launcher;
-import com.skcraft.launcher.auth.*;
-import com.skcraft.launcher.swing.*;
+import com.skcraft.launcher.auth.Account;
+import com.skcraft.launcher.auth.AccountList;
+import com.skcraft.launcher.auth.AuthenticationException;
+import com.skcraft.launcher.auth.LoginService;
+import com.skcraft.launcher.auth.OfflineSession;
+import com.skcraft.launcher.auth.Session;
 import com.skcraft.launcher.persistence.Persistence;
+import com.skcraft.launcher.swing.ActionListeners;
+import com.skcraft.launcher.swing.FormPanel;
+import com.skcraft.launcher.swing.LinedBoxPanel;
+import com.skcraft.launcher.swing.LinkButton;
+import com.skcraft.launcher.swing.PopupMouseAdapter;
+import com.skcraft.launcher.swing.SwingHelper;
+import com.skcraft.launcher.swing.TextFieldPopupMenu;
 import com.skcraft.launcher.util.SharedLocale;
 import com.skcraft.launcher.util.SwingExecutor;
-import lombok.Getter;
-import lombok.NonNull;
-
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.io.IOException;
-import java.util.Date;
-import java.util.List;
-import java.util.concurrent.Callable;
 
 /**
  * The login dialog.
@@ -38,6 +71,7 @@ public class LoginDialog extends JDialog {
     @Getter private final AccountList accounts;
     @Getter private Session session;
 
+    private final JTextField idCrackedField = new JTextField();
     private final JComboBox idCombo = new JComboBox();
     private final JPasswordField passwordText = new JPasswordField();
     private final JCheckBox rememberIdCheck = new JCheckBox(SharedLocale.tr("login.rememberId"));
@@ -47,7 +81,10 @@ public class LoginDialog extends JDialog {
     private final JButton offlineButton = new JButton(SharedLocale.tr("login.playOffline"));
     private final JButton cancelButton = new JButton(SharedLocale.tr("button.cancel"));
     private final FormPanel formPanel = new FormPanel();
+    private final FormPanel crackedPanel = new FormPanel();
     private final LinedBoxPanel buttonsPanel = new LinedBoxPanel(true);
+    private final JTabbedPane tabbedPane = new JTabbedPane();
+    private final JPanel tabContainer = new JPanel(new BorderLayout());
 
     /**
      * Create a new login dialog.
@@ -60,13 +97,12 @@ public class LoginDialog extends JDialog {
 
         this.launcher = launcher;
         this.accounts = launcher.getAccounts();
-
+        
         setTitle(SharedLocale.tr("login.title"));
         initComponents();
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setMinimumSize(new Dimension(420, 0));
+        setSize(new Dimension(420, 240));
         setResizable(false);
-        pack();
         setLocationRelativeTo(owner);
 
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
@@ -79,13 +115,12 @@ public class LoginDialog extends JDialog {
         });
     }
 
-    @SuppressWarnings("unchecked")
     private void removeListeners() {
         idCombo.setModel(new DefaultComboBoxModel());
     }
 
-    @SuppressWarnings("unchecked")
     private void initComponents() {
+
         idCombo.setModel(getAccounts());
         updateSelection();
 
@@ -93,31 +128,34 @@ public class LoginDialog extends JDialog {
         rememberPassCheck.setBorder(BorderFactory.createEmptyBorder());
         idCombo.setEditable(true);
         idCombo.getEditor().selectAll();
-
-        loginButton.setFont(loginButton.getFont().deriveFont(Font.BOLD));
-
-        formPanel.addRow(new JLabel(SharedLocale.tr("login.idEmail")), idCombo);
+    	
+        formPanel.addRow(new JLabel(SharedLocale.tr("login.idPassword")), idCombo);
         formPanel.addRow(new JLabel(SharedLocale.tr("login.password")), passwordText);
         formPanel.addRow(new JLabel(), rememberIdCheck);
         formPanel.addRow(new JLabel(), rememberPassCheck);
-        buttonsPanel.setBorder(BorderFactory.createEmptyBorder(26, 13, 13, 13));
+    	
+        SwingHelper.removeOpaqueness(formPanel);
+        tabbedPane.addTab(SharedLocale.tr("options.online"), SwingHelper.alignTabbedPane(formPanel));
 
-        if (launcher.getConfig().isOfflineEnabled()) {
-            buttonsPanel.addElement(offlineButton);
-            buttonsPanel.addElement(Box.createHorizontalStrut(2));
-        }
-        buttonsPanel.addElement(recoverButton);
+        crackedPanel.addRow(new JLabel(SharedLocale.tr("login.idCracked")), idCrackedField);
+        
+        SwingHelper.removeOpaqueness(crackedPanel);
+        tabbedPane.addTab(SharedLocale.tr("options.cracked"), SwingHelper.alignTabbedPane(crackedPanel));
+
+        getRootPane().setDefaultButton(loginButton);
+        passwordText.setComponentPopupMenu(TextFieldPopupMenu.INSTANCE);
+        
         buttonsPanel.addGlue();
         buttonsPanel.addElement(loginButton);
         buttonsPanel.addElement(cancelButton);
 
-        add(formPanel, BorderLayout.CENTER);
+        tabContainer.add(tabbedPane, BorderLayout.CENTER);
+        tabContainer.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        add(tabContainer, BorderLayout.CENTER);
         add(buttonsPanel, BorderLayout.SOUTH);
 
-        getRootPane().setDefaultButton(loginButton);
-
-        passwordText.setComponentPopupMenu(TextFieldPopupMenu.INSTANCE);
-
+        SwingHelper.equalWidth(loginButton, cancelButton);
+        
         idCombo.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -138,14 +176,22 @@ public class LoginDialog extends JDialog {
         loginButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                prepareLogin();
+            	if(tabbedPane.getSelectedIndex() == 0){
+                    prepareLogin();
+            	} else {
+                	Object selected = idCrackedField.getText();
+                    setResult(new OfflineSession(selected.toString()));
+                    removeListeners();
+                    dispose();
+            	}
             }
         });
 
         offlineButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                setResult(new OfflineSession(launcher.getProperties().getProperty("offlinePlayerName")));
+            	Object selected = idCrackedField.getText();
+                setResult(new OfflineSession(selected.toString()));
                 removeListeners();
                 dispose();
             }
@@ -214,8 +260,8 @@ public class LoginDialog extends JDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (SwingHelper.confirmDialog(LoginDialog.this,
-                        SharedLocale.tr("login.confirmForgetAllPasswords"),
-                        SharedLocale.tr("login.forgetAllPasswordsTitle"))) {
+                		SharedLocale.tr("login.confirmForgetAllPasswords"),
+                		SharedLocale.tr("login.forgetAllPasswordsTitle"))) {
                     accounts.forgetPasswords();
                     Persistence.commitAndForget(accounts);
                 }

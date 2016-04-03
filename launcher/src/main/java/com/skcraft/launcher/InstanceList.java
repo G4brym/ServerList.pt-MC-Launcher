@@ -8,17 +8,19 @@ package com.skcraft.launcher;
 
 import com.skcraft.concurrency.DefaultProgress;
 import com.skcraft.concurrency.ProgressObservable;
+import com.skcraft.launcher.dialog.VersionDialog;
 import com.skcraft.launcher.model.modpack.ManifestInfo;
 import com.skcraft.launcher.model.modpack.PackageList;
 import com.skcraft.launcher.persistence.Persistence;
 import com.skcraft.launcher.util.HttpRequest;
 import com.skcraft.launcher.util.SharedLocale;
+
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.java.Log;
+
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 
-import javax.swing.*;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -34,7 +36,7 @@ import static com.skcraft.launcher.LauncherUtils.concat;
  * Stores the list of instances.
  */
 @Log
-public class InstanceList extends AbstractListModel<Instance> {
+public class InstanceList {
 
     private final Launcher launcher;
     @Getter private final List<Instance> instances = new ArrayList<Instance>();
@@ -98,17 +100,6 @@ public class InstanceList extends AbstractListModel<Instance> {
      */
     public synchronized void sort() {
         Collections.sort(instances);
-        fireContentsChanged(this, 0, size());
-    }
-
-    @Override
-    public int getSize() {
-        return size();
-    }
-
-    @Override
-    public Instance getElementAt(int index) {
-        return get(index);
     }
 
     public final class Enumerator implements Callable<InstanceList>, ProgressObservable {
@@ -151,6 +142,9 @@ public class InstanceList extends AbstractListModel<Instance> {
                         .expectResponseCode(200)
                         .returnContent()
                         .asJson(PackageList.class);
+                
+                VersionDialog.setLastVersion(packages.getLastVersion());                
+                VersionDialog.setVersions(packages.getVersions());
 
                 if (packages.getMinimumVersion() > Launcher.PROTOCOL_VERSION) {
                     throw new LauncherException("Update required", SharedLocale.tr("errors.updateRequiredError"));
@@ -206,7 +200,6 @@ public class InstanceList extends AbstractListModel<Instance> {
                     instances.clear();
                     instances.addAll(local);
                     instances.addAll(remote);
-                    fireContentsChanged(this, 0, size());
 
                     log.info(instances.size() + " instance(s) enumerated.");
                 }

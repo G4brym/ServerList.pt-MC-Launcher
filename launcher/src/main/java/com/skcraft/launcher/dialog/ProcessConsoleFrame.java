@@ -216,11 +216,7 @@ public class ProcessConsoleFrame extends ConsoleFrame {
     }
 
     private boolean confirmKill() {
-        if (System.getProperty("skcraftLauncher.killWithoutConfirm", "false").equalsIgnoreCase("true")) {
-            return true;
-        } else {
-            return SwingHelper.confirmDialog(this,  SharedLocale.tr("console.confirmKill"), SharedLocale.tr("console.confirmKillTitle"));
-        }
+        return SwingHelper.confirmDialog(this,  SharedLocale.tr("console.confirmKill"), SharedLocale.tr("console.confirmKillTitle"));
     }
 
     private void minimize() {
